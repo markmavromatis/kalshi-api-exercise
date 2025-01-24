@@ -29,20 +29,17 @@ console.log(`${getDateTimeAsString()} Querying Kalshi...`);
     const response = await restApi.fetchMarketsFromKalshi(cursor);
     cursor = response.cursor;
     const foundRecords = response.results;
-    console.log(
-      `${getDateTimeAsString()} Retrieved ${foundRecords.length} records!`
-    );
     // Add data to database
     dbFunctions.addMarketsToDb(foundRecords);
     console.log(
-      `${getDateTimeAsString()} Iteration records: ${foundRecords.length}!`
+      `${getDateTimeAsString()} Iteration records: ${foundRecords.length}`
     );
     allResults = allResults.concat(foundRecords);
     console.log(
-      `${getDateTimeAsString()} Total records: ${allResults.length}!`
+      `${getDateTimeAsString()} Total records: ${allResults.length}`
     );
   } while (cursor);
 
-  console.log(`Processed ${foundRecords.length} records`);
+  console.log(`Processed ${allResults.length} records`);
   db.close;
 })();
