@@ -1,0 +1,14 @@
+{
+  "name": "kalshi-api-exercise",
+  "version": "1.0.0",
+  "description": "Exercise to build a tool to extract / view Kalshi market and trade data",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sqlite3": "5"
+  }
+}
