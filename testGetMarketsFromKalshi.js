@@ -6,18 +6,42 @@ const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
 dbFunctions.setupDatabase();
 
-const beforeQueryTime = new Date();
-console.log(`${beforeQueryTime.toISOString()} Querying Kalshi...`);
+function getDateTimeAsString() {
+  let currentTime = new Date();
+  return currentTime.toISOString();
+}
+
+console.log(`${getDateTimeAsString()} Querying Kalshi...`);
 
 (async function () {
+  // Paginated results retrieved from Kalshi using cursor
   let allResults = [];
-  let response = await restApi.fetchMarketsFromKalshi();
-  const foundRecords = response.results;
-  allResults.concat(foundRecords);
-  dbFunctions.addMarketsToDb(foundRecords);
-
-  const afterQueryTime = new Date();
-  console.log(`${afterQueryTime.toISOString()} Done!`);
+  let cursor;
+  do {
+    if (cursor) {
+      console.log(
+        `${getDateTimeAsString()} Querying markets data with cursor: ${cursor}!`
+      );
+    } else {
+      console.log(`${getDateTimeAsString()} Querying markets data`);
+    }
+    // Fetch data from Kalshi
+    const response = await restApi.fetchMarketsFromKalshi(cursor);
+    cursor = response.cursor;
+    const foundRecords = response.results;
+    console.log(
+      `${getDateTimeAsString()} Retrieved ${foundRecords.length} records!`
+    );
+    // Add data to database
+    dbFunctions.addMarketsToDb(foundRecords);
+    console.log(
+      `${getDateTimeAsString()} Iteration records: ${foundRecords.length}!`
+    );
+    allResults = allResults.concat(foundRecords);
+    console.log(
+      `${getDateTimeAsString()} Total records: ${allResults.length}!`
+    );
+  } while (cursor);
 
   console.log(`Processed ${foundRecords.length} records`);
   db.close;
