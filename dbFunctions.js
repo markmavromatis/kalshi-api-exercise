@@ -7,7 +7,7 @@ function setupDatabase() {
   // Setup DB
   db.serialize(() => {
     db.run(
-      "CREATE TABLE IF NOT EXISTS MARKETS (ticker TEXT PRIMARY KEY, event_ticker TEXT, market_type TEXT, title TEXT, status TEXT, yes_bid INTEGER, no_bid INTEGER, open_time TEXT, close_time TEXT, expected_expiration_time TEXT, expiration_time TEXT, volume INTEGER, liquidity INTEGER)"
+      "CREATE TABLE IF NOT EXISTS MARKETS (ticker TEXT PRIMARY KEY, event_ticker TEXT, market_type TEXT, title TEXT, subtitle TEXT, yes_subtitle TEXT, no_subtitle, TEXT, status TEXT, yes_bid INTEGER, no_bid INTEGER, open_time TEXT, close_time TEXT, expected_expiration_time TEXT, expiration_time TEXT, volume INTEGER, liquidity INTEGER)"
     );
     db.run(
       "CREATE TABLE IF NOT EXISTS EVENTS (event_ticker TEXT PRIMARY KEY, series_ticker TEXT NULL, sub_title TEXT NULL, title TEXT NULL, mutually_exclusive TEXT NULL, category TEXT NULL)"
@@ -63,6 +63,9 @@ function addUpdateMarket(
   eventTicker,
   marketType,
   title,
+  subtitle,
+  yesSubtitle,
+  noSubtitle,
   status,
   yesBid,
   noBid,
@@ -82,7 +85,7 @@ function addUpdateMarket(
       } else {
         if (row.count == 0) {
           const stmt = db.prepare(
-            "INSERT INTO MARKETS (ticker, event_ticker, market_type, title, status, yes_bid, no_bid, open_time, close_time, expected_expiration_time, expiration_time, volume, liquidity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            "INSERT INTO MARKETS (ticker, event_ticker, market_type, title, subtitle, yes_subtitle, no_subtitle, status, yes_bid, no_bid, open_time, close_time, expected_expiration_time, expiration_time, volume, liquidity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
           );
           stmt.run(
             [
@@ -90,6 +93,9 @@ function addUpdateMarket(
               eventTicker,
               marketType,
               title,
+              subtitle,
+              yesSubtitle,
+              noSubtitle,
               status,
               yesBid,
               noBid,
@@ -180,6 +186,9 @@ async function addMarketsToDb(results) {
     const eventTicker = result.event_ticker;
     const marketType = result.market_type;
     const title = result.title;
+    const subtitle = result.subtitle;
+    const yesSubtitle = result.yes_sub_title;
+    const noSubtitle = result.no_sub_title;
     const status = result.status;
     const yesBid = result.yes_bid;
     const noBid = result.no_bid;
@@ -203,6 +212,9 @@ async function addMarketsToDb(results) {
       eventTicker,
       marketType,
       title,
+      subtitle,
+      yesSubtitle,
+      noSubtitle,
       status,
       yesBid,
       noBid,
