@@ -1,18 +1,19 @@
 // Setup database
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
+const moment = require("moment");
 
 function setupDatabase() {
   // Setup DB
   db.serialize(() => {
     db.run(
-      "CREATE TABLE IF NOT EXISTS MARKETS (ticker TEXT PRIMARY KEY, event_ticker TEXT NULL, market_type TEXT NULL, title TEXT NULL, status TEXT NULL, yes_bid REAL NULL, no_bid REAL NULL)"
+      "CREATE TABLE IF NOT EXISTS MARKETS (ticker TEXT PRIMARY KEY, event_ticker TEXT, market_type TEXT, title TEXT, status TEXT, yes_bid INTEGER, no_bid INTEGER, open_time TEXT, close_time TEXT, expected_expiration_time TEXT, expiration_time TEXT, volume INTEGER, liquidity INTEGER)"
     );
     db.run(
       "CREATE TABLE IF NOT EXISTS EVENTS (event_ticker TEXT PRIMARY KEY, series_ticker TEXT NULL, sub_title TEXT NULL, title TEXT NULL, mutually_exclusive TEXT NULL, category TEXT NULL)"
     );
     db.run(
-      "CREATE TABLE IF NOT EXISTS TRADES (trade_id TEXT PRIMARY KEY, ticker TEXT NULL, count INT, yes_price REAL, no_price REAL, taker_side TEXT NULL, created_time TEXT NULL)"
+      "CREATE TABLE IF NOT EXISTS TRADES (trade_id TEXT PRIMARY KEY, ticker TEXT NULL, count INT, yes_price REAL, no_price REAL, taker_side TEXT, created_time TEXT)"
     );
   });
 }
@@ -37,7 +38,14 @@ function addUpdateEvent(
             "INSERT INTO EVENTS (event_ticker, series_ticker, sub_title, title, mutually_exclusive, category) VALUES (?,?,?,?,?,?)"
           );
           stmt.run(
-            [eventTicker, seriesTicker, subTitle, title, mutuallyExclusive, category],
+            [
+              eventTicker,
+              seriesTicker,
+              subTitle,
+              title,
+              mutuallyExclusive,
+              category,
+            ],
             function (err) {
               console.log("Inserted record: " + eventTicker);
             }
@@ -57,7 +65,13 @@ function addUpdateMarket(
   title,
   status,
   yesBid,
-  noBid
+  noBid,
+  openTime,
+  closeTime,
+  expectedExpirationTime,
+  expirationTime,
+  volume,
+  liquidity
 ) {
   const rows = db.get(
     "SELECT COUNT(*) as count FROM MARKETS WHERE ticker = ?",
@@ -68,12 +82,28 @@ function addUpdateMarket(
       } else {
         if (row.count == 0) {
           const stmt = db.prepare(
-            "INSERT INTO MARKETS (ticker, event_ticker, market_type, title, status, yes_bid, no_bid) VALUES (?,?,?,?,?,?,?)"
+            "INSERT INTO MARKETS (ticker, event_ticker, market_type, title, status, yes_bid, no_bid, open_time, close_time, expected_expiration_time, expiration_time, volume, liquidity) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
           );
           stmt.run(
-            [ticker, eventTicker, marketType, title, status, yesBid, noBid],
+            [
+              ticker,
+              eventTicker,
+              marketType,
+              title,
+              status,
+              yesBid,
+              noBid,
+              openTime,
+              closeTime,
+              expectedExpirationTime,
+              expirationTime,
+              volume,
+              liquidity,
+            ],
             function (err) {
-              console.log("Inserted record: " + ticker);
+              if (err) {
+                console.error("ERROR inserting record: " + ticker, err);
+              }
             }
           );
           stmt.finalize();
@@ -140,18 +170,33 @@ async function addEventsToDb(results) {
   });
 }
 
-
 async function addMarketsToDb(results) {
   console.log("Adding " + results.length + " markets to database!");
   results.forEach((result) => {
+    // console.log(JSON.stringify(result));
+    // return 0;
     // Check for existing ticker
     const ticker = result.ticker;
     const eventTicker = result.event_ticker;
     const marketType = result.market_type;
     const title = result.title;
     const status = result.status;
-    const yesBid = result.yes_Bid;
+    const yesBid = result.yes_bid;
     const noBid = result.no_bid;
+    const openTime = moment(Date.parse(result.open_time)).format(
+      "YYYY-MM-DD HH:MM:SS.SSS"
+    );
+    const closeTime = moment(Date.parse(result.close_time)).format(
+      "YYYY-MM-DD HH:MM:SS.SSS"
+    );
+    const expectedExpirationTime = moment(
+      Date.parse(result.expected_expiration_time)
+    ).format("YYYY-MM-DD HH:MM:SS.SSS");
+    const expirationTime = moment(Date.parse(result.expiration_time)).format(
+      "YYYY-MM-DD HH:MM:SS.SSS"
+    );
+    const volume = result.volume;
+    const liquidity = result.liquidity;
     console.log("Adding ticker: " + ticker);
     addUpdateMarket(
       ticker,
@@ -160,7 +205,13 @@ async function addMarketsToDb(results) {
       title,
       status,
       yesBid,
-      noBid
+      noBid,
+      openTime,
+      closeTime,
+      expectedExpirationTime,
+      expirationTime,
+      volume,
+      liquidity
     );
     return Promise.resolve(true);
   });
@@ -176,7 +227,9 @@ async function addTradesToDb(results) {
     const yesPrice = result.yes_price;
     const noPrice = result.no_price;
     const takerSide = result.taker_side;
-    const createdTime = result.created_time;
+    const createdTime = moment(Date.parse(result.created_time)).format(
+      "YYYY-MM-DD HH:MM:SS.SSS"
+    );
     console.log("Adding trade: " + tradeId);
     addUpdateTrade(
       tradeId,
@@ -190,4 +243,9 @@ async function addTradesToDb(results) {
     return Promise.resolve(true);
   });
 }
-module.exports = { setupDatabase, addEventsToDb, addMarketsToDb, addTradesToDb };
+module.exports = {
+  setupDatabase,
+  addEventsToDb,
+  addMarketsToDb,
+  addTradesToDb,
+};
