@@ -2,6 +2,12 @@
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
 const moment = require("moment");
+const MOMENT_FORMAT = "YYYY-MM-DD HH:mm:ss.SSS";
+
+// Format date as a date / time string in YYYY-MM-DD HH:mm:ss.SSS format
+function getFormattedDateTime(dateToFormat) {
+  return moment(dateToFormat).format(MOMENT_FORMAT);
+}
 
 function setupDatabase() {
   // Setup DB
@@ -13,12 +19,41 @@ function setupDatabase() {
       "CREATE TABLE IF NOT EXISTS EVENTS (event_ticker TEXT PRIMARY KEY, series_ticker TEXT NULL, sub_title TEXT NULL, title TEXT NULL, mutually_exclusive TEXT NULL, category TEXT NULL)"
     );
     db.run(
+      "CREATE TABLE IF NOT EXISTS SERIES (ticker TEXT PRIMARY KEY, frequency TEXT, title TEXT, category TEXT)"
+    );
+    db.run(
       "CREATE TABLE IF NOT EXISTS TRADES (trade_id TEXT PRIMARY KEY, ticker TEXT NULL, count INT, yes_price REAL, no_price REAL, taker_side TEXT, created_time TEXT)"
     );
   });
 }
 
-function addUpdateEvent(
+function getSeriesTickers() {
+  console.log("Inside method getSeriesTickers");
+  return new Promise((resolve, reject) => {
+    // const db = new sqlite3.Database("kalshi.db");
+    const query = "SELECT DISTINCT series_ticker FROM EVENTS";
+    let results = [];
+
+    db.all(query, [], (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        rows.forEach((row) => {
+          const ticker = row.series_ticker;
+          if (ticker != '') {
+            // EVENT CASE-087 is missing a series ticker. Skipping for now.
+            results.push(row.series_ticker);
+          }
+        });
+        resolve(results);  // Resolve the promise with the results array
+      }
+    });
+
+    // db.close();
+  });
+}
+
+  function addUpdateEvent(
   eventTicker,
   seriesTicker,
   subTitle,
@@ -120,6 +155,46 @@ function addUpdateMarket(
   return rows;
 }
 
+// Does the series already exist in the database?
+async function doesSeriesExist(ticker) {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT COUNT(*) as count FROM SERIES WHERE ticker = ?";
+    db.get(query, ticker, (err, row) => { 
+      if (err) {
+        reject(err);  // Reject the promise if there's an error
+      } else {
+        resolve( row.count > 0);
+      }
+    })
+  })
+}
+
+function addUpdateSeries(
+  ticker,
+  frequency,
+  title,
+  category
+) {
+    const stmt = db.prepare(
+      "INSERT INTO SERIES (ticker, frequency, title, category) VALUES (?,?,?,?)"
+    );
+    stmt.run(
+      [
+        ticker,
+        frequency,
+        title,
+        category
+      ],
+      function (err) {
+        if (err) {
+          console.error("ERROR inserting record: " + ticker, err);
+        }
+      }
+    );
+    stmt.finalize();
+  }
+
+
 function addUpdateTrade(
   tradeId,
   ticker,
@@ -179,9 +254,7 @@ async function addEventsToDb(results) {
 async function addMarketsToDb(results) {
   console.log("Adding " + results.length + " markets to database!");
   results.forEach((result) => {
-    // console.log(JSON.stringify(result));
-    // return 0;
-    // Check for existing ticker
+
     const ticker = result.ticker;
     const eventTicker = result.event_ticker;
     const marketType = result.market_type;
@@ -192,18 +265,10 @@ async function addMarketsToDb(results) {
     const status = result.status;
     const yesBid = result.yes_bid;
     const noBid = result.no_bid;
-    const openTime = moment(Date.parse(result.open_time)).format(
-      "YYYY-MM-DD HH:MM:SS.SSS"
-    );
-    const closeTime = moment(Date.parse(result.close_time)).format(
-      "YYYY-MM-DD HH:MM:SS.SSS"
-    );
-    const expectedExpirationTime = moment(
-      Date.parse(result.expected_expiration_time)
-    ).format("YYYY-MM-DD HH:MM:SS.SSS");
-    const expirationTime = moment(Date.parse(result.expiration_time)).format(
-      "YYYY-MM-DD HH:MM:SS.SSS"
-    );
+    const openTime = getFormattedDateTime(Date.parse(result.open_time));
+    const closeTime = getFormattedDateTime(Date.parse(result.close_time));
+    const expectedExpirationTime = getFormattedDateTime(Date.parse(result.expected_expiration_time));
+    const expirationTime = getFormattedDateTime(Date.parse(result.expiration_time));
     const volume = result.volume;
     const liquidity = result.liquidity;
     console.log("Adding ticker: " + ticker);
@@ -239,9 +304,7 @@ async function addTradesToDb(results) {
     const yesPrice = result.yes_price;
     const noPrice = result.no_price;
     const takerSide = result.taker_side;
-    const createdTime = moment(Date.parse(result.created_time)).format(
-      "YYYY-MM-DD HH:MM:SS.SSS"
-    );
+    const createdTime = getFormattedDateTime(Date.parse(result.created_time));
     console.log("Adding trade: " + tradeId);
     addUpdateTrade(
       tradeId,
@@ -256,8 +319,11 @@ async function addTradesToDb(results) {
   });
 }
 module.exports = {
+  addUpdateSeries,
   setupDatabase,
   addEventsToDb,
   addMarketsToDb,
   addTradesToDb,
+  doesSeriesExist,
+  getSeriesTickers,
 };
