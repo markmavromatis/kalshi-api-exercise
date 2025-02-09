@@ -27,6 +27,23 @@ function setupDatabase() {
   });
 }
 
+function getLastDownloadedTrade() {
+  console.log("Inside method getLastDownloadedTrade...");
+  return new Promise((resolve, reject) => {
+    const query = "SELECT TRADES.trade_id FROM TRADES ORDER BY created_time DESC LIMIT 1";
+    let results = [];
+
+    db.get(query, [], (err, row) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(row.trade_id);  // Resolve the promise with the results array
+      }
+    });
+  });
+
+}
+
 function getSeriesTickers() {
   console.log("Inside method getSeriesTickers");
   return new Promise((resolve, reject) => {
@@ -204,29 +221,42 @@ function addUpdateTrade(
   takerSide,
   createdTime
 ) {
-  const rows = db.get(
-    "SELECT COUNT(*) as count FROM TRADES WHERE trade_id = ?",
-    ticker,
-    (err, row) => {
-      if (err) {
-        console.error(err);
-      } else {
-        if (row.count == 0) {
-          const stmt = db.prepare(
-            "INSERT INTO TRADES (trade_id, ticker, count, yes_price, no_price, taker_side, created_time) VALUES (?,?,?,?,?,?,?)"
-          );
-          stmt.run(
-            [tradeId, ticker, count, yesPrice, noPrice, takerSide, createdTime],
-            function (err) {
-              console.log("Inserted record: " + ticker);
-            }
-          );
-          stmt.finalize();
+  console.log("Inside method addUpdateTrade: " + tradeId);
+  return new Promise((resolve, reject) => {
+    console.log("Checking trades count for id: " + tradeId);
+    db.get(
+      "SELECT COUNT(*) as count FROM TRADES WHERE trade_id = ?",
+      tradeId,
+      (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          if (row.count == 0) {
+            console.log("Inserting trade: " + tradeId);
+            const stmt = db.prepare(
+              "INSERT INTO TRADES (trade_id, ticker, count, yes_price, no_price, taker_side, created_time) VALUES (?,?,?,?,?,?,?)"
+            );
+            stmt.run(
+              [tradeId, ticker, count, yesPrice, noPrice, takerSide, createdTime], (err) => {
+                if (err) {
+                  console.log(`Error inserting trade ${tradeId}: ${err}`);
+                  reject(err);
+                } else {
+                  stmt.finalize();
+                  console.log("Resolving: " + tradeId);
+                  resolve();
+                }
+              }
+            );
+          } else {
+            console.log("Skipping trade: " + tradeId);
+            resolve();
+          }
         }
       }
-    }
-  );
-  return rows;
+    );
+  })
+  
 }
 async function addEventsToDb(results) {
   console.log("Adding " + results.length + " events to database!");
@@ -296,28 +326,36 @@ async function addMarketsToDb(results) {
 
 async function addTradesToDb(results) {
   console.log("Adding " + results.length + " trades to database!");
-  results.forEach((result) => {
-    // Check for existing ticker
-    const tradeId = result.trade_id;
-    const ticker = result.ticker;
-    const count = result.count;
-    const yesPrice = result.yes_price;
-    const noPrice = result.no_price;
-    const takerSide = result.taker_side;
-    const createdTime = getFormattedDateTime(Date.parse(result.created_time));
-    console.log("Adding trade: " + tradeId);
-    addUpdateTrade(
-      tradeId,
-      ticker,
-      count,
-      yesPrice,
-      noPrice,
-      takerSide,
-      createdTime
-    );
-    return Promise.resolve(true);
+  return new Promise((resolve, reject) => {
+    const insertPromises = [];
+    for (const result of results) {
+      // Check for existing ticker
+      const tradeId = result.trade_id;
+      const ticker = result.ticker;
+      const count = result.count;
+      const yesPrice = result.yes_price;
+      const noPrice = result.no_price;
+      const takerSide = result.taker_side;
+      const createdTime = getFormattedDateTime(Date.parse(result.created_time));
+      console.log("Adding trade: " + tradeId);
+      insertPromises.push(addUpdateTrade(
+        tradeId,
+        ticker,
+        count,
+        yesPrice,
+        noPrice,
+        takerSide,
+        createdTime
+      ));
+      console.log(`ADDED trade ${tradeId}`);
+    };
+    Promise.all(insertPromises).then(() => {
+      console.log("Resolving addTradesToDb...");
+      resolve(true);
+    });
   });
 }
+
 module.exports = {
   addUpdateSeries,
   setupDatabase,
@@ -325,5 +363,6 @@ module.exports = {
   addMarketsToDb,
   addTradesToDb,
   doesSeriesExist,
+  getLastDownloadedTrade,
   getSeriesTickers,
 };
