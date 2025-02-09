@@ -1,9 +1,11 @@
 const restApi = require("./restFunctions");
 const dbFunctions = require("./dbFunctions");
+const logger = require('./logger');
 
 // Setup database
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
+
 dbFunctions.setupDatabase();
 
 function getDateTimeAsString() {
@@ -11,7 +13,7 @@ function getDateTimeAsString() {
   return currentTime.toISOString();
 }
 
-console.log(`${getDateTimeAsString()} Querying Kalshi...`);
+logger.info(`${getDateTimeAsString()} Querying Kalshi...`);
 
 (async function () {
   // Paginated results retrieved from Kalshi using cursor
@@ -19,11 +21,11 @@ console.log(`${getDateTimeAsString()} Querying Kalshi...`);
   let cursor;
   do {
     if (cursor) {
-      console.log(
+      logger.info(
         `${getDateTimeAsString()} Querying markets data with cursor: ${cursor}!`
       );
     } else {
-      console.log(`${getDateTimeAsString()} Querying markets data`);
+      logger.info(`${getDateTimeAsString()} Querying markets data`);
     }
     // Fetch data from Kalshi
     const response = await restApi.fetchMarketsFromKalshi(cursor);
@@ -31,15 +33,15 @@ console.log(`${getDateTimeAsString()} Querying Kalshi...`);
     const foundRecords = response.results;
     // Add data to database
     dbFunctions.addMarketsToDb(foundRecords);
-    console.log(
+    logger.info(
       `${getDateTimeAsString()} Iteration records: ${foundRecords.length}`
     );
     allResults = allResults.concat(foundRecords);
-    console.log(
+    logger.info(
       `${getDateTimeAsString()} Total records: ${allResults.length}`
     );
   } while (cursor);
 
-  console.log(`Processed ${allResults.length} records`);
+  logger.info(`Processed ${allResults.length} records`);
   db.close;
 })();

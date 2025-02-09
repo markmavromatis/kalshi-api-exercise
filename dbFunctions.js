@@ -1,6 +1,7 @@
 // Setup database
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
+const logger = require("./logger");
 const moment = require("moment");
 const MOMENT_FORMAT = "YYYY-MM-DD HH:mm:ss.SSS";
 
@@ -28,7 +29,7 @@ function setupDatabase() {
 }
 
 function getLastDownloadedTrade() {
-  console.log("Inside method getLastDownloadedTrade...");
+  logger.info("Inside method getLastDownloadedTrade...");
   return new Promise((resolve, reject) => {
     const query = "SELECT TRADES.trade_id FROM TRADES ORDER BY created_time DESC LIMIT 1";
     let results = [];
@@ -45,9 +46,8 @@ function getLastDownloadedTrade() {
 }
 
 function getSeriesTickers() {
-  console.log("Inside method getSeriesTickers");
+  logger.info("Inside method getSeriesTickers");
   return new Promise((resolve, reject) => {
-    // const db = new sqlite3.Database("kalshi.db");
     const query = "SELECT DISTINCT series_ticker FROM EVENTS";
     let results = [];
 
@@ -99,7 +99,7 @@ function getSeriesTickers() {
               category,
             ],
             function (err) {
-              console.log("Inserted record: " + eventTicker);
+              logger.info("Inserted record: " + eventTicker);
             }
           );
           stmt.finalize();
@@ -221,9 +221,9 @@ function addUpdateTrade(
   takerSide,
   createdTime
 ) {
-  console.log("Inside method addUpdateTrade: " + tradeId);
+  logger.debug("Inside method addUpdateTrade: " + tradeId);
   return new Promise((resolve, reject) => {
-    console.log("Checking trades count for id: " + tradeId);
+    logger.debug("Checking trades count for id: " + tradeId);
     db.get(
       "SELECT COUNT(*) as count FROM TRADES WHERE trade_id = ?",
       tradeId,
@@ -232,24 +232,24 @@ function addUpdateTrade(
           reject(err);
         } else {
           if (row.count == 0) {
-            console.log("Inserting trade: " + tradeId);
+            logger.debug("Inserting trade: " + tradeId);
             const stmt = db.prepare(
               "INSERT INTO TRADES (trade_id, ticker, count, yes_price, no_price, taker_side, created_time) VALUES (?,?,?,?,?,?,?)"
             );
             stmt.run(
               [tradeId, ticker, count, yesPrice, noPrice, takerSide, createdTime], (err) => {
                 if (err) {
-                  console.log(`Error inserting trade ${tradeId}: ${err}`);
+                  logger.error(`Error inserting trade ${tradeId}: ${err}`);
                   reject(err);
                 } else {
                   stmt.finalize();
-                  console.log("Resolving: " + tradeId);
+                  logger.info(`Inserted trade ${tradeId} into database`);
                   resolve();
                 }
               }
             );
           } else {
-            console.log("Skipping trade: " + tradeId);
+            logger.info("Skipping trade: " + tradeId);
             resolve();
           }
         }
@@ -259,7 +259,7 @@ function addUpdateTrade(
   
 }
 async function addEventsToDb(results) {
-  console.log("Adding " + results.length + " events to database!");
+  logger.info("Adding " + results.length + " events to database!");
   results.forEach((result) => {
     // Check for existing ticker
     const eventTicker = result.event_ticker;
@@ -268,7 +268,7 @@ async function addEventsToDb(results) {
     const title = result.title;
     const mutually_exclusive = result.mutually_exclusive;
     const category = result.category;
-    console.log("Adding event: " + eventTicker);
+    logger.info("Adding event: " + eventTicker);
     addUpdateEvent(
       eventTicker,
       seriesTicker,
@@ -282,7 +282,7 @@ async function addEventsToDb(results) {
 }
 
 async function addMarketsToDb(results) {
-  console.log("Adding " + results.length + " markets to database!");
+  logger.info("Adding " + results.length + " markets to database!");
   results.forEach((result) => {
 
     const ticker = result.ticker;
@@ -301,7 +301,7 @@ async function addMarketsToDb(results) {
     const expirationTime = getFormattedDateTime(Date.parse(result.expiration_time));
     const volume = result.volume;
     const liquidity = result.liquidity;
-    console.log("Adding ticker: " + ticker);
+    logger.info("Adding ticker: " + ticker);
     addUpdateMarket(
       ticker,
       eventTicker,
@@ -325,7 +325,7 @@ async function addMarketsToDb(results) {
 }
 
 async function addTradesToDb(results) {
-  console.log("Adding " + results.length + " trades to database!");
+  logger.info("Adding " + results.length + " trades to database!");
   return new Promise((resolve, reject) => {
     const insertPromises = [];
     for (const result of results) {
@@ -337,7 +337,7 @@ async function addTradesToDb(results) {
       const noPrice = result.no_price;
       const takerSide = result.taker_side;
       const createdTime = getFormattedDateTime(Date.parse(result.created_time));
-      console.log("Adding trade: " + tradeId);
+      logger.info("Adding trade: " + tradeId);
       insertPromises.push(addUpdateTrade(
         tradeId,
         ticker,
@@ -347,10 +347,10 @@ async function addTradesToDb(results) {
         takerSide,
         createdTime
       ));
-      console.log(`ADDED trade ${tradeId}`);
+      logger.info(`ADDED trade ${tradeId}`);
     };
     Promise.all(insertPromises).then(() => {
-      console.log("Resolving addTradesToDb...");
+      logger.info("Resolving addTradesToDb...");
       resolve(true);
     });
   });

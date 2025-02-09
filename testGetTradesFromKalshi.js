@@ -4,6 +4,9 @@ const dbFunctions = require("./dbFunctions");
 // Setup database
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
+const logger = require('./logger');
+
+
 dbFunctions.setupDatabase();
 
 function getDateTimeAsString() {
@@ -20,7 +23,7 @@ function containsLastTradeId(foundRecords, lastTradeId) {
   return false;
 }
 
-console.log(`${getDateTimeAsString()} Querying Kalshi...`);
+logger.info(`${getDateTimeAsString()} Querying Kalshi...`);
 
 (async function () {
   // Paginated results retrieved from Kalshi using cursor
@@ -29,7 +32,7 @@ console.log(`${getDateTimeAsString()} Querying Kalshi...`);
 
 // What was the last trade that we downloaded from Kalshi?
 const lastTradeId = await dbFunctions.getLastDownloadedTrade();
-console.log("Last trade ID: " + lastTradeId);
+logger.info("Last trade ID: " + lastTradeId);
 // return 0;
 
 // Trades are downloaded in order from newest to oldest.
@@ -37,34 +40,34 @@ console.log("Last trade ID: " + lastTradeId);
   let resultsContainLastTradeId = false;
   do {
     if (cursor) {
-      console.log(
+      logger.info(
         `${getDateTimeAsString()} Querying trades data with cursor: ${cursor}!`
       );
     } else {
-      console.log(`${getDateTimeAsString()} Querying trades data`);
+      logger.info(`${getDateTimeAsString()} Querying trades data`);
     }
     // Fetch data from Kalshi
-    console.log("Fetching trades...");
+    logger.info("Fetching trades...");
     const response = await restApi.fetchTradesFromKalshi(cursor);
-    console.log("Fetching trades complete");
+    logger.info("Fetching trades complete");
     cursor = response.cursor;
     const foundRecords = response.results;
     // Check for last trade ID
-    console.log("Does it include the last loaded trade?");
+    logger.info("Does it include the last loaded trade?");
     resultsContainLastTradeId = containsLastTradeId(foundRecords, lastTradeId);
-    console.log("Result: " + resultsContainLastTradeId);
+    logger.info("Result: " + resultsContainLastTradeId);
 
     // Add data to database
     await dbFunctions.addTradesToDb(foundRecords);
-    console.log(
+    logger.info(
       `${getDateTimeAsString()} Iteration records: ${foundRecords.length}`
     );
     allResults = allResults.concat(foundRecords);
-    console.log(
+    logger.info(
       `${getDateTimeAsString()} Total records: ${allResults.length}`
     );
   } while (cursor && !resultsContainLastTradeId);
 
-  console.log(`Processed ${allResults.length} records`);
+  logger.info(`Processed ${allResults.length} records`);
   db.close;
 })();
