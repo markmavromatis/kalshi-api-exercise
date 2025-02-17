@@ -1,6 +1,6 @@
-const restApi = require("./restFunctions");
-const dbFunctions = require("./dbFunctions");
-const logger = require('./logger');
+const restApi = require("../lib/restFunctions");
+const dbFunctions = require("../lib/dbFunctions");
+const logger = require('../lib/logger').default;
 
 // Setup database
 const sqlite3 = require("sqlite3").verbose();

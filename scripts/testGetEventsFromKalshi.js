@@ -1,10 +1,10 @@
-const restApi = require("./restFunctions");
-const dbFunctions = require("./dbFunctions");
+const restApi = require("../lib/restFunctions");
+const dbFunctions = require("../lib/dbFunctions");
 
 // Setup database
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("kalshi.db");
-const logger = require('./logger');
+const logger = require('../lib/logger').default;
 dbFunctions.setupDatabase();
 
 function getDateTimeAsString() {
